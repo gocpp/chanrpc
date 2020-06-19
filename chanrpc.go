@@ -3,11 +3,9 @@ package chanrpc
 import (
 	"fmt"
 	"reflect"
-	"sync"
 )
 
 type server struct {
-	m         sync.RWMutex
 	functions map[string]interface{}
 	chanReq   chan *Request
 }
@@ -35,9 +33,6 @@ func (s *server) R() chan *Request {
 }
 
 func (s *server) Register(name string, f interface{}) {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	_, ok := s.functions[name]
 	if ok {
 		panic("chanrpc Register error")
