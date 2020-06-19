@@ -33,7 +33,7 @@ func TestNewServer(t *testing.T) {
 
 	ch := make(chan int)
 	go func() {
-		req := <-s.ChanCall
+		req := <-s.R()
 		s.Exec(req)
 		ch <- 1
 	}()

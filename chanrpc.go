@@ -9,7 +9,7 @@ import (
 type server struct {
 	m         sync.RWMutex
 	functions map[string]interface{}
-	ChanCall  chan *CallInfo
+	chanCall  chan *CallInfo
 }
 
 type CallInfo struct {
@@ -20,7 +20,11 @@ type CallInfo struct {
 func NewServer(l int) *server {
 	return &server{
 		functions: make(map[string]interface{}),
-		ChanCall:  make(chan *CallInfo, l)}
+		chanCall:  make(chan *CallInfo, l)}
+}
+
+func (s *server) R() chan *CallInfo {
+	return s.chanCall
 }
 
 func (s *server) Register(name string, f interface{}) {
@@ -37,12 +41,12 @@ func (s *server) Register(name string, f interface{}) {
 
 func (s *server) Send(f string, args ...interface{}) {
 	req := &CallInfo{f: f, args: args}
-	s.ChanCall <- req
+	s.chanCall <- req
 }
 
 func (s *server) Call(f string, args ...interface{}) {
 	req := &CallInfo{f: f, args: args}
-	s.ChanCall <- req
+	s.chanCall <- req
 }
 
 func (s *server) Exec(r *CallInfo) ([]reflect.Value, error) {
