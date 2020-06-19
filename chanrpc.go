@@ -9,22 +9,29 @@ import (
 type server struct {
 	m         sync.RWMutex
 	functions map[string]interface{}
-	chanCall  chan *CallInfo
+	chanReq   chan *Request
 }
 
-type CallInfo struct {
-	f    string
-	args []interface{}
+type Request struct {
+	f        string
+	args     []interface{}
+	resp     bool
+	chanResp chan *Response
+}
+
+type Response struct {
+	rets []interface{}
+	err  error
 }
 
 func NewServer(l int) *server {
 	return &server{
 		functions: make(map[string]interface{}),
-		chanCall:  make(chan *CallInfo, l)}
+		chanReq:   make(chan *Request, l)}
 }
 
-func (s *server) R() chan *CallInfo {
-	return s.chanCall
+func (s *server) R() chan *Request {
+	return s.chanReq
 }
 
 func (s *server) Register(name string, f interface{}) {
@@ -40,28 +47,39 @@ func (s *server) Register(name string, f interface{}) {
 }
 
 func (s *server) Send(f string, args ...interface{}) {
-	req := &CallInfo{f: f, args: args}
-	s.chanCall <- req
+	req := &Request{f: f, args: args, resp: false}
+	s.chanReq <- req
 }
 
-func (s *server) Call(f string, args ...interface{}) {
-	req := &CallInfo{f: f, args: args}
-	s.chanCall <- req
+func (s *server) Call(f string, args ...interface{}) (rets []interface{}, err error) {
+	req := &Request{f: f, args: args, resp: true, chanResp: make(chan *Response)}
+	s.chanReq <- req
+	resp := <-req.chanResp
+	rets = resp.rets
+	err = resp.err
+	close(req.chanResp)
+	return
 }
 
-func (s *server) Exec(r *CallInfo) ([]reflect.Value, error) {
+func (s *server) Exec(r *Request) (err error) {
 	var (
-		f         interface{}
-		ok        bool
-		rType     reflect.Type
-		rValue    reflect.Value
-		retValues []reflect.Value
+		f             interface{}
+		ok            bool
+		rType         reflect.Type
+		rValue        reflect.Value
+		retValues     []reflect.Value
+		retInterfaces []interface{}
 	)
 
 	f, ok = s.functions[r.f]
 	if !ok {
-		return retValues, fmt.Errorf("chanrpc Exec error, invalid function: %s", r.f)
+		err = fmt.Errorf("chanrpc Exec error, invalid function: %s", r.f)
+		if r.resp {
+			r.chanResp <- &Response{rets: retInterfaces, err: err}
+		}
+		return
 	}
+
 	rType = reflect.TypeOf(f)
 	rValue = reflect.ValueOf(f)
 
@@ -69,7 +87,14 @@ func (s *server) Exec(r *CallInfo) ([]reflect.Value, error) {
 	for i := 0; i < rType.NumIn(); i++ {
 		in[i] = reflect.ValueOf(r.args[i])
 	}
-
 	retValues = rValue.Call(in)
-	return retValues, nil
+
+	if r.resp {
+		retInterfaces = make([]interface{}, len(retValues))
+		for i, rv := range retValues {
+			retInterfaces[i] = rv.Interface()
+		}
+		r.chanResp <- &Response{rets: retInterfaces, err: nil}
+	}
+	return
 }

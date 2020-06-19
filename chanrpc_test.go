@@ -24,7 +24,7 @@ func (u *util) print(age int, name string) {
 	fmt.Println(u.num, age, name)
 }
 
-func TestNewServer(t *testing.T) {
+func TestServer_Send(t *testing.T) {
 	ut := NewUtil(20)
 
 	s := NewServer(10)
@@ -38,7 +38,27 @@ func TestNewServer(t *testing.T) {
 		ch <- 1
 	}()
 
-	s.Call("print", 100, "cinder")
+	s.Send("print", 100, "cinder")
+	<-ch
+}
+
+func TestServer_Call(t *testing.T) {
+	ut := NewUtil(20)
+
+	s := NewServer(10)
+	s.Register("add", ut.add)
+	s.Register("print", ut.print)
+
+	ch := make(chan int)
+	go func() {
+		req := <-s.R()
+		s.Exec(req)
+		ch <- 1
+	}()
+
+	r1, err := s.Call("add", 100, 200)
+	fmt.Println(r1, err)
+	fmt.Println(r1[0].(int), r1[1].([]int))
 	<-ch
 }
 
@@ -56,6 +76,6 @@ func BenchmarkServer_Exec(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s.Exec(&CallInfo{f: "add", args: args})
+		s.Exec(&Request{f: "add", args: args})
 	}
 }
