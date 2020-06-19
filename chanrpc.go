@@ -45,26 +45,27 @@ func (s *server) Call(f string, args ...interface{}) {
 	s.ChanCall <- req
 }
 
-func (s *server) Exec(r *CallInfo) error {
+func (s *server) Exec(r *CallInfo) ([]reflect.Value, error) {
 	var (
-		f      interface{}
-		ok     bool
-		rType  reflect.Type
-		rValue reflect.Value
+		f         interface{}
+		ok        bool
+		rType     reflect.Type
+		rValue    reflect.Value
+		retValues []reflect.Value
 	)
 
 	f, ok = s.functions[r.f]
 	if !ok {
-		return fmt.Errorf("chanrpc Exec error, invalid function: %s", r.f)
+		return retValues, fmt.Errorf("chanrpc Exec error, invalid function: %s", r.f)
 	}
-
 	rType = reflect.TypeOf(f)
 	rValue = reflect.ValueOf(f)
+
 	in := make([]reflect.Value, rType.NumIn())
 	for i := 0; i < rType.NumIn(); i++ {
 		in[i] = reflect.ValueOf(r.args[i])
 	}
 
-	rValue.Call(in)
-	return nil
+	retValues = rValue.Call(in)
+	return retValues, nil
 }
