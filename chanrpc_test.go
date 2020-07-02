@@ -58,7 +58,9 @@ func TestServer_Call(t *testing.T) {
 
 	r1, err := s.Call("add", 100, 200)
 	fmt.Println(r1, err)
-	fmt.Println(r1[0].(int), r1[1].([]int))
+	if err != nil {
+		fmt.Println(r1[0].(int))
+	}
 	<-ch
 }
 
